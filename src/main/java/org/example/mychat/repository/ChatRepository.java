@@ -1,0 +1,9 @@
+package org.example.mychat.repository;
+
+import org.example.mychat.model.Chat;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+@Repository
+public interface ChatRepository extends JpaRepository<Chat, Long> {
+}

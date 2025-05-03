@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat</title>
+    <style>
+        /* Asosiy stil */
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f0f2f5;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            color: #333;
+        }
+
+        /* Chat konteyneri */
+        .chat-container {
+            width: 400px;
+            max-width: 100%;
+            height: 600px;
+            background-color: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* Chat sarlavhasi */
+        .chat-header {
+            background-color: #4a76a8;
+            color: white;
+            padding: 15px 20px;
+            text-align: center;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .chat-header h2 {
+            margin: 0;
+            font-size: 1.5rem;
+        }
+
+        /* Xabarlar ro'yxati */
+        .chat-messages {
+            flex: 1;
+            padding: 15px;
+            overflow-y: auto;
+            list-style-type: none;
+            margin: 0;
+            background-color: #f5f5f5;
+        }
+
+        /* Xabar qutisi (bubble) */
+        .chat-bubble {
+            max-width: 70%;
+            padding: 10px 15px;
+            margin-bottom: 10px;
+            border-radius: 18px;
+            word-wrap: break-word;
+            position: relative;
+            animation: fadeIn 0.3s ease;
+        }
+
+        /* Yuborilgan xabarlar */
+        .chat-bubble.sent {
+            background-color: #4a76a8;
+            color: white;
+            margin-left: auto;
+            border-bottom-right-radius: 4px;
+        }
+
+        /* Qabul qilingan xabarlar */
+        .chat-bubble.received {
+            background-color: #e5e5ea;
+            color: black;
+            margin-right: auto;
+            border-bottom-left-radius: 4px;
+        }
+
+        /* Yozayotganlik indikatori */
+        .typing-indicator {
+            padding: 0 20px;
+            font-size: 0.9rem;
+            color: #666;
+            font-style: italic;
+            height: 20px;
+            margin: 5px 0;
+        }
+
+        /* Kirish maydonlari konteyneri */
+        .chat-input-container {
+            display: flex;
+            padding: 15px;
+            background-color: #f9f9f9;
+            border-top: 1px solid #eee;
+            gap: 10px;
+        }
+
+        /* Kirish maydonlari */
+        .chat-input {
+            flex: 1;
+            padding: 10px 15px;
+            border: 1px solid #ddd;
+            border-radius: 20px;
+            outline: none;
+            font-size: 1rem;
+            transition: border-color 0.3s;
+        }
+
+        .chat-input:focus {
+            border-color: #4a76a8;
+        }
+
+        /* Yuborish tugmasi */
+        .send-btn {
+            background-color: #4a76a8;
+            color: white;
+            border: none;
+            border-radius: 20px;
+            padding: 10px 20px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: background-color 0.3s;
+        }
+
+        .send-btn:hover {
+            background-color: #3a6690;
+        }
+
+        /* Animatsiyalar */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Scrollbar stil */
+        .chat-messages::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .chat-messages::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 3px;
+        }
+
+        .chat-messages::-webkit-scrollbar-thumb {
+            background: #ccc;
+            border-radius: 3px;
+        }
+
+        .chat-messages::-webkit-scrollbar-thumb:hover {
+            background: #aaa;
+        }
+
+        /* Vaqt ko'rsatgichi */
+        .message-time {
+            font-size: 0.7rem;
+            color: rgba(255, 255, 255, 0.7);
+            margin-left: 8px;
+        }
+
+        .chat-bubble.received .message-time {
+            color: rgba(0, 0, 0, 0.5);
+        }
+
+        /* Mobil moslashuvchanlik */
+        @media (max-width: 480px) {
+            .chat-container {
+                height: 100vh;
+                width: 100%;
+                border-radius: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="chat-container">
+    <div class="chat-header">
+        <h2>MyChat</h2>
+    </div>
+
+    <ul id="messages" class="chat-messages"></ul>
+
+    <p id="typing" class="typing-indicator"></p>
+
+    <div class="chat-input-container">
+        <input id="sender" type="text" placeholder="Your name" class="chat-input" />
+        <input id="msg" type="text" placeholder="Type a message..." class="chat-input" onkeypress="typing()" />
+        <button onclick="sendMessage()" class="send-btn">Send</button>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/sockjs-client@1.6.1/dist/sockjs.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/stompjs@2.3.3/lib/stomp.min.js"></script>
+<script>
+    const socket = new SockJS("/chat");
+    const stompClient = Stomp.over(socket);
+
+    stompClient.connect({}, () => {
+        console.log("Connected to WebSocket");
+
+        stompClient.subscribe("/topic/chat", (event) => {
+            console.log("Received message: ", event.body);
+            const messageData = JSON.parse(event.body);
+            const li = document.createElement("li");
+
+            // Agar xabarni yuboruvchi hozirgi foydalanuvchi bo'lsa
+            const currentUser = document.getElementById("sender").value;
+            if (messageData.from === currentUser) {
+                li.classList.add("chat-bubble", "sent");
+            } else {
+                li.classList.add("chat-bubble", "received");
+            }
+
+            // Vaqt ko'rsatgichi
+            const now = new Date();
+            const timeString = now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+
+            li.innerHTML = `<div><strong>${messageData.from}</strong> <span class="message-time">${timeString}</span></div>
+                            <div>${messageData.content}</div>`;
+
+            document.getElementById("messages").appendChild(li);
+
+            // Avtomatik scroll
+            const messagesContainer = document.getElementById("messages");
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        });
+
+        stompClient.subscribe("/topic/typing", (event) => {
+            const typingIndicator = document.getElementById("typing");
+            const currentUser = document.getElementById("sender").value;
+            const data = JSON.parse(event.body);
+
+            if (data.from !== currentUser) {
+                typingIndicator.textContent = `${data.from} is typing...`;
+                setTimeout(() => {
+                    typingIndicator.textContent = '';
+                }, 2000);
+            }
+        });
+    }, (error) => {
+        console.error("Connection error:", error);
+    });
+
+    function sendMessage() {
+        const messageInput = document.getElementById("msg");
+        const senderInput = document.getElementById("sender");
+
+        if (messageInput.value.trim() === '' || senderInput.value.trim() === '') {
+            alert("Please enter your name and message");
+            return;
+        }
+
+        stompClient.send("/app/send", {}, JSON.stringify({
+            from: senderInput.value,
+            chatId: 1,
+            content: messageInput.value
+        }));
+
+        messageInput.value = '';
+    }
+
+    function typing() {
+        const sender = document.getElementById("sender");
+        if (sender.value.trim() === '') return;
+
+        stompClient.send("/app/typing", {}, JSON.stringify({
+            from: sender.value,
+            chatId: 1,
+            content: null
+        }));
+    }
+
+    // Enter tugmasi bilan xabar yuborish
+    document.getElementById("msg").addEventListener("keypress", (e) => {
+        if (e.key === "Enter") {
+            sendMessage();
+        }
+    });
+</script>
+</body>
+</html>
